@@ -1,0 +1,100 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Outputs:
+  QueueARN:
+    Description: The ARN of the SQS Queue
+    Export:
+      Name: SlackMessengerQueueARN
+    Value:
+      Fn::GetAtt:
+      - SlackMessengerQueue
+      - Arn
+  QueueName:
+    Description: The name of the Queue
+    Export:
+      Name: SlackMessengerQueueName
+    Value:
+      Fn::GetAtt:
+      - SlackMessengerQueue
+      - QueueName
+  QueueURL:
+    Description: URL of the SQS Queue
+    Export:
+      Name: SlackMessenegerQueueURL
+    Value:
+      Ref: SlackMessengerQueue
+Resources:
+  FunctionPolicy:
+    DependsOn: FunctionRole
+    Properties:
+      PolicyDocument:
+        Statement:
+        - Action:
+          - sqs:ReceiveMessage
+          - sqs:GetQueueAttributes
+          - sqs:DeleteMessage
+          - sqs:ChangeMessageVisibility
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:GetLogEvents
+          - logs:PutLogEvents
+          Effect: Allow
+          Resource: '*'
+        Version: '2012-10-17'
+      PolicyName: SlackMessengerLambdaPolicy
+      Roles:
+      - Ref: FunctionRole
+    Type: AWS::IAM::Policy
+  FunctionRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+        Version: '2012-10-17'
+      RoleName: SlackMessengerLambdaRole
+    Type: AWS::IAM::Role
+  SlackMessenger:
+    DependsOn: FunctionPolicy
+    Properties:
+      CodeUri: s3://rbipedartifacts/e2ddedf8be8189675f892ac8d0c34a86
+      Events:
+        SQSEvent:
+          Properties:
+            BatchSize: 10
+            Queue:
+              Fn::GetAtt:
+              - SlackMessengerQueue
+              - Arn
+          Type: SQS
+      Handler: slack_messenger.handler
+      MemorySize: 128
+      Policies:
+      - Statement:
+        - Action:
+          - sqs:ReceiveMessage
+          - sqs:GetQueueAttributes
+          - sqs:DeleteMessage
+          - sqs:ChangeMessageVisibility
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:GetLogEvents
+          - logs:PutLogEvents
+          Effect: Allow
+          Resource: '*'
+        Version: '2012-10-17'
+      Role:
+        Fn::GetAtt:
+        - FunctionRole
+        - Arn
+      Runtime: python3.6
+      Timeout: 10
+    Type: AWS::Serverless::Function
+  SlackMessengerQueue:
+    Properties:
+      QueueName: SlackMessengeQueue
+    Type: AWS::SQS::Queue
+Transform: AWS::Serverless-2016-10-31

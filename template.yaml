@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+
+  SlackMessenger:
+    Type: AWS::Serverless::Function
+    DependsOn: FunctionPolicy
+    Properties:
+      Handler: slack_messenger.handler
+      Runtime: python3.6
+      Timeout: 10
+      MemorySize: 128
+      Role: !GetAtt FunctionRole.Arn
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - "sqs:ReceiveMessage"
+                - "sqs:GetQueueAttributes"
+                - "sqs:DeleteMessage"
+                - "sqs:ChangeMessageVisibility"
+                - "logs:CreateLogGroup"
+                - "logs:CreateLogStream"
+                - "logs:GetLogEvents"
+                - "logs:PutLogEvents"
+              Resource: "*"
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt SlackMessengerQueue.Arn
+            BatchSize: 10
+
+  FunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: SlackMessengerLambdaRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+
+  FunctionPolicy:
+    Type: AWS::IAM::Policy
+    DependsOn: FunctionRole
+    Properties:
+      PolicyName: SlackMessengerLambdaPolicy
+      Roles:
+      - !Ref FunctionRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Action:
+              - "sqs:ReceiveMessage"
+              - "sqs:GetQueueAttributes"
+              - "sqs:DeleteMessage"
+              - "sqs:ChangeMessageVisibility"
+              - "logs:CreateLogGroup"
+              - "logs:CreateLogStream"
+              - "logs:GetLogEvents"
+              - "logs:PutLogEvents"
+            Resource: "*"
+
+  SlackMessengerQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: SlackMessengeQueue
+
+Outputs:
+
+  QueueURL:
+    Description: "URL of the SQS Queue"
+    Value: !Ref SlackMessengerQueue
+    Export:
+      Name: SlackMessenegerQueueURL
+
+  QueueARN:
+    Description: "The ARN of the SQS Queue"
+    Value: !GetAtt SlackMessengerQueue.Arn
+    Export:
+      Name: SlackMessengerQueueARN
+
+  QueueName:
+    Description: "The name of the Queue"
+    Value: !GetAtt SlackMessengerQueue.QueueName
+    Export:
+      Name: SlackMessengerQueueName
